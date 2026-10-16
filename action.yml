@@ -1,0 +1,58 @@
+name: 'transl8 sync'
+description: >-
+  Pull or push translations inside your own CI pipeline. This action is a
+  thin wrapper around the transl8 CLI (npm package @transl8.ai/api-client).
+  The api-base-url input is required: the CLI has no default host.
+
+inputs:
+  api-key:
+    description: >-
+      transl8 project API key (ta_live_...). Pass via a secret, never inline.
+      "pull" of a locale over 1000 rows starts an async export job and needs
+      the exports:write scope too; exports:read covers smaller locales.
+    required: true
+  project:
+    description: 'transl8 project id or slug'
+    required: true
+  command:
+    description: '"pull" (export a locale to a file) or "push" (import a file)'
+    required: false
+    default: 'pull'
+  locales:
+    description: >-
+      Comma-separated locales for "pull" (e.g. "fr,de,ja"). Ignored for "push".
+    required: false
+    default: ''
+  format:
+    description: 'Export/import format (default: json)'
+    required: false
+    default: 'json'
+  file:
+    description: 'File to import for "push" (required when command is "push")'
+    required: false
+    default: ''
+  out-dir:
+    description: 'Directory "pull" writes <locale>.<format> files into'
+    required: false
+    default: '.'
+  api-base-url:
+    description: >-
+      transl8 API host, for example https://your-transl8-host. Host only,
+      without /api/v1. The CLI has no default host.
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Run transl8 CLI
+      shell: bash
+      env:
+        TRANSL8_API_KEY: ${{ inputs.api-key }}
+        TRANSL8_API_BASE_URL: ${{ inputs.api-base-url }}
+        TRANSL8_PROJECT: ${{ inputs.project }}
+        TRANSL8_COMMAND: ${{ inputs.command }}
+        TRANSL8_LOCALES: ${{ inputs.locales }}
+        TRANSL8_FORMAT: ${{ inputs.format }}
+        TRANSL8_FILE: ${{ inputs.file }}
+        TRANSL8_OUT_DIR: ${{ inputs.out-dir }}
+      run: ${{ github.action_path }}/run.sh

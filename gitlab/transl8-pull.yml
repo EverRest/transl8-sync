@@ -1,0 +1,46 @@
+# Use this job to pull a translated bundle (or push source strings) through
+# the transl8 CLI (npm package @transl8.ai/api-client). Include this file
+# with `include: remote:` or copy the job into your .gitlab-ci.yml. See the
+# README of this repository for both ways.
+#
+# Set TRANSL8_API_KEY as a masked/protected CI/CD variable — never commit it.
+# A read-only key (exports:read) is enough for locales up to 1000 rows; a larger
+# locale starts an async export job, which needs exports:write too — without it
+# the pull fails with "EXPORT_TOO_LARGE ... needs an API key with the
+# exports:write scope".
+
+transl8-pull:
+  stage: build
+  image: node:22-alpine
+  variables:
+    TRANSL8_API_BASE_URL: 'https://your-transl8-host' # API host only, no /api/v1; the CLI has no default host
+    TRANSL8_PROJECT: 'my-project' # your project id or slug
+    TRANSL8_LOCALES: 'fr,de,ja' # comma-separated
+    TRANSL8_FORMAT: 'json'
+  script:
+    - mkdir -p locales
+    - |
+      # POSIX sh — node:22-alpine has no bash. `set -f`: no filename globbing
+      # of the locale list (a `*` stays a `*`); an empty list fails like the
+      # GitHub Action does instead of passing with no files.
+      set -f
+      [ -n "$TRANSL8_LOCALES" ] || { echo "transl8: TRANSL8_LOCALES is empty" >&2; exit 1; }
+      for LOCALE in $(echo "$TRANSL8_LOCALES" | tr ',' ' '); do
+        npx -y -p @transl8.ai/api-client@2 transl8 pull "$TRANSL8_PROJECT" "$LOCALE" \
+          --format="$TRANSL8_FORMAT" > "locales/$LOCALE.$TRANSL8_FORMAT"
+      done
+  artifacts:
+    paths:
+      - locales/
+  # TRANSL8_API_KEY is read from $TRANSL8_API_KEY automatically — the CLI
+  # falls back to that env var when --key isn't passed.
+
+# Pushing source strings instead — same image/variables, different script:
+#
+# transl8-push:
+#   stage: build
+#   image: node:22-alpine
+#   variables:
+#     TRANSL8_PROJECT: 'my-project'
+#   script:
+#     - npx -y -p @transl8.ai/api-client@2 transl8 push locales/en.json --project="$TRANSL8_PROJECT"

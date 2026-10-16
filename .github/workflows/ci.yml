@@ -1,0 +1,40 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: bash run.test.sh
+      - run: bash gitlab/transl8-pull.test.sh
+  action:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Start the stub server
+        id: stub
+        run: |
+          node test/stub-server.mjs > "$RUNNER_TEMP/stub.out" 2> "$RUNNER_TEMP/stub.err" &
+          for _ in $(seq 1 50); do
+            [ -s "$RUNNER_TEMP/stub.out" ] && break
+            sleep 0.1
+          done
+          echo "port=$(head -n 1 "$RUNNER_TEMP/stub.out")" >> "$GITHUB_OUTPUT"
+      - uses: ./
+        with:
+          api-key: ta_live_ci
+          project: demo
+          command: pull
+          locales: fr
+          out-dir: out
+          api-base-url: http://127.0.0.1:${{ steps.stub.outputs.port }}
+      - name: Check the pulled file
+        run: node -e 'JSON.parse(require("fs").readFileSync("out/fr.json","utf8")); console.log("fr.json is valid JSON")'
